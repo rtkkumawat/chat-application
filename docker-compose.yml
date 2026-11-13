@@ -1,0 +1,52 @@
+# Full local stack: PostgreSQL + Firestore emulator + API. No Firebase account needed.
+#   docker compose up --build
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: chat
+      POSTGRES_PASSWORD: chat
+      POSTGRES_DB: chat
+    ports:
+      - '5433:5432'
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U chat -d chat']
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  firestore:
+    image: gcr.io/google.com/cloudsdktool/google-cloud-cli:emulators
+    command: gcloud emulators firestore start --host-port=0.0.0.0:8080 --project=demo-chat
+    ports:
+      - '8080:8080'
+
+  migrate:
+    build: .
+    command: ['node', 'dist/db/migrate-cli.js']
+    environment:
+      DATABASE_URL: postgres://chat:chat@postgres:5432/chat
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  api:
+    build: .
+    environment:
+      PORT: 3000
+      DATABASE_URL: postgres://chat:chat@postgres:5432/chat
+      MESSAGE_STORE: firestore
+      FIREBASE_PROJECT_ID: demo-chat
+      FIRESTORE_EMULATOR_HOST: firestore:8080
+    ports:
+      - '3000:3000'
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      firestore:
+        condition: service_started
+
+volumes:
+  pgdata:

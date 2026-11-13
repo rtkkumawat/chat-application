@@ -1,0 +1,85 @@
+### Walkthrough of the API. Works with the VS Code "REST Client" extension or
+### JetBrains HTTP client: run the requests top to bottom.
+
+@base = http://localhost:3000
+
+### Create two users
+# @name alice
+POST {{base}}/user
+Content-Type: application/json
+
+{ "displayName": "Alice", "email": "alice@example.com" }
+
+###
+# @name bob
+POST {{base}}/user
+Content-Type: application/json
+
+{ "displayName": "Bob", "email": "bob@example.com" }
+
+### 1. Create or get the 1:1 chat (201 first time, 200 afterwards)
+# @name chat
+POST {{base}}/chat/create
+Content-Type: application/json
+
+{ "userAId": "{{alice.response.body.id}}", "userBId": "{{bob.response.body.id}}" }
+
+### 2. Send a message
+# @name message
+POST {{base}}/chat/{{chat.response.body.chatId}}/message/send
+Content-Type: application/json
+
+{ "senderId": "{{alice.response.body.id}}", "text": "Hello Bob!" }
+
+### 3. Get messages (ordered by timestamp)
+GET {{base}}/chat/{{chat.response.body.chatId}}/messages?limit=50
+
+### 4. Mark the message as read
+POST {{base}}/chat/{{chat.response.body.chatId}}/message/{{message.response.body.id}}/read
+Content-Type: application/json
+
+{ "userId": "{{bob.response.body.id}}" }
+
+### 5. Update Bob's last seen message
+POST {{base}}/chat/{{chat.response.body.chatId}}/lastseen
+Content-Type: application/json
+
+{ "userId": "{{bob.response.body.id}}", "messageId": "{{message.response.body.id}}" }
+
+### 6. List Alice's chats with member ids
+GET {{base}}/user/{{alice.response.body.id}}/chats
+
+### Bonus: edit the message (sender only)
+PATCH {{base}}/chat/{{chat.response.body.chatId}}/message/{{message.response.body.id}}
+Content-Type: application/json
+
+{ "userId": "{{alice.response.body.id}}", "text": "Hello Bob! (edited)" }
+
+### Bonus: delete the message (sender only, soft delete)
+DELETE {{base}}/chat/{{chat.response.body.chatId}}/message/{{message.response.body.id}}
+Content-Type: application/json
+
+{ "userId": "{{alice.response.body.id}}" }
+
+### Bonus: create a group
+# @name group
+POST {{base}}/chat/group
+Content-Type: application/json
+
+{
+  "creatorId": "{{alice.response.body.id}}",
+  "title": "Project team",
+  "memberIds": ["{{bob.response.body.id}}"]
+}
+
+### Bonus: rename the group (owner only)
+PATCH {{base}}/chat/{{group.response.body.chatId}}
+Content-Type: application/json
+
+{ "actorId": "{{alice.response.body.id}}", "title": "Project team (renamed)" }
+
+### Bonus: leave the group (actorId === userId) or remove a member (owner)
+DELETE {{base}}/chat/{{group.response.body.chatId}}/members/{{bob.response.body.id}}
+Content-Type: application/json
+
+{ "actorId": "{{bob.response.body.id}}" }
